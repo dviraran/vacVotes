@@ -43,8 +43,8 @@ vac$code = paste0(vac$town_code,agas)
 vac$date = as.Date(vac$date)
 
 ## choose rows every 30 days from dose 1, and every 30 days from dose 3
-vac = subset(vac,vac$date %in% c(seq(from=as.Date('2020-12-21'),to=as.Date('2021-07-30'),by='30 day'),
-                                 seq(from=as.Date('2021-07-31'),to=as.Date('2021-11-30'),by='30 day')))
+vac = subset(vac,vac$date %in% c(seq(from=as.Date('2020-11-21'),to=as.Date('2021-07-30'),by='30 day'),
+                                 seq(from=as.Date('2021-07-01'),to=as.Date('2021-11-30'),by='30 day')))
 
 socioeconomic = readSE(working.dir)
 ages = getAreasAges(working.dir)
@@ -62,6 +62,10 @@ df$accumulated_recoveries[is.na(as.numeric(df$accumulated_recoveries))] = 5
 
 df$time = as.numeric(as.Date(df$date))
 df$time = df$time-min(df$time)
+
+
+### order
+df = df[order(df$code,df$time),]
 
 # define vote groups
 df$ProBibi = df$Likud+df$Shas+df$YahadutHatora+df$ZionutDatit
@@ -89,13 +93,22 @@ df$AravitL = log((df$Aravit+eps)/(df$reference+eps))
 df$OtherNoVoteL = log((df$OtherNoVote+eps)/(df$reference+eps))
 df$LikudL = log((df$Likud+eps)/(df$reference+eps))
 
-
 # change - date after coalition change
 df$change = as.numeric(as.Date(df$date,origin='1899-12-21')>=as.Date('2021-06-13'))
 
 df$code = factor(df$code)
 df$AGE_SV = as.numeric(df$AGE_SV)
-df$accumulated_cases = as.numeric(df$accumulated_cases)
+#df$accumulated_cases = as.numeric(df$accumulated_cases)
+
+accumulated_cases1_start = as.numeric(df$accumulated_cases[df$time==0])
+names(accumulated_cases1_start) = df$code[df$time==0]
+accumulated_cases3_start = as.numeric(df$accumulated_cases[df$time==222])
+names(accumulated_cases3_start) = df$code[df$time==222]
+
+df$accumulated_cases1 = as.numeric(df$accumulated_cases)-accumulated_cases1_start[df$code]
+df$accumulated_cases3 = as.numeric(df$accumulated_cases)-accumulated_cases3_start[df$code]
+df$accumulated_cases1 = c(0,df$accumulated_cases1[-nrow(df)])
+df$accumulated_cases3 = c(0,df$accumulated_cases3[-nrow(df)])
 
 df$vax1 = as.numeric(df$accumulated_vaccination_first_dose)
 df$vax3 = as.numeric(df$accumulated_vaccination_third_dose)
@@ -108,14 +121,15 @@ df$vax_potential3 = vax_potential3[df$code]
 df$weights = df$Nsize/max(df$Nsize)
 
 createDataTimeFromStrat = function(df,n.months) {
-  out1 = subset(df,df$time==n.months*30)
-  out1$vax = out1$vax1
-  out1$vax_potential = out1$vax_potential1
+  out1 = subset(df,df$time==n.months*30+30)
+  out1$vax = out1$vax1/out1$Nsize
+  out1$vax_potential = out1$vax_potential1/out1$Nsize
+  out1$accumulated_cases = out1$accumulated_cases1/out1$Nsize
   
-  out2 = subset(df,df$time==222+n.months*30)
-  out2$vax = out2$vax3
-  out2$vax_potential = out2$vax_potential3
-  
+  out2 = subset(df,df$time==222+n.months*30+30)
+  out2$vax = out2$vax3/out2$Nsize
+  out2$vax_potential = out2$vax_potential3/out2$Nsize
+  out2$accumulated_cases = out2$accumulated_cases3/out2$Nsize
   
   out = rbind(out1,out2)
   out
@@ -127,9 +141,9 @@ df3 = createDataTimeFromStrat(df, n.months=3)
 
 #### create models (not working now, need to choose how to do them)
 
-model1 = glmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + offset(log(vax_potential)) + (1|code), 
-               data=temp,family=poisson,
-               control=glmerControl(optCtrl=list(maxfun=2e5)))
+#model1 = glmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + offset(log(vax_potential)) + (1|code), 
+#               data=df3,family=poisson,
+#               control=glmerControl(optCtrl=list(maxfun=2e5)))
 
 model1 = lmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + vax_potential + (1|code), 
               weights = weights, data=df1)
@@ -171,7 +185,7 @@ model3 = lmer(vax ~
                 accumulated_cases + 
                 vax_potential + 
                 (1|code), 
-              weights = weights, data=df3)
+              data=df3)
 
 sjPlot::plot_model(model3,show.values=TRUE, show.p=TRUE,
                    terms = c('change:ShasL','change:YahadutHatoraL','change:ZionutDatitL',
@@ -179,7 +193,7 @@ sjPlot::plot_model(model3,show.values=TRUE, show.p=TRUE,
                              'change:KaholLavanL','change:YeshAtidL','change:AvodaL',
                              'change:MeretzL','change:RaamL','change:AravitL'
                    ))+
-  geom_hline(yintercept = 0,linetype='dashed')
+  geom_hline(yintercept = 1,linetype='dashed')
 
 
 sjPlot::plot_models(model3,model2,model1,show.values=TRUE, show.p=TRUE,
