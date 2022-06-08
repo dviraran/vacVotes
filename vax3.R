@@ -57,7 +57,7 @@ df = merge(df,ages,by='code')
 df$accumulated_vaccination_first_dose[is.na(as.numeric(df$accumulated_vaccination_first_dose))] = 5
 df$accumulated_vaccination_second_dose[is.na(as.numeric(df$accumulated_vaccination_second_dose))] = 5
 df$accumulated_vaccination_third_dose[is.na(as.numeric(df$accumulated_vaccination_third_dose))] = 5
-df$accumulated_cases[is.na(as.numeric(df$accumulated_vaccination_third_dose))] = 5
+df$accumulated_cases[is.na(as.numeric(df$accumulated_cases))] = 5
 df$accumulated_recoveries[is.na(as.numeric(df$accumulated_recoveries))] = 5
 
 df$time = as.numeric(as.Date(df$date))
@@ -122,12 +122,12 @@ df$weights = df$Nsize/max(df$Nsize)
 
 createDataTimeFromStrat = function(df,n.months) {
   out1 = subset(df,df$time==n.months*30+30)
-  out1$vax = out1$vax1/out1$Nsize
+  out1$vax = out1$vax1/out1$vax_potential1
   out1$vax_potential = out1$vax_potential1/out1$Nsize
   out1$accumulated_cases = out1$accumulated_cases1/out1$Nsize
   
   out2 = subset(df,df$time==222+n.months*30+30)
-  out2$vax = out2$vax3/out2$Nsize
+  out2$vax = out2$vax3/out2$vax_potential3
   out2$vax_potential = out2$vax_potential3/out2$Nsize
   out2$accumulated_cases = out2$accumulated_cases3/out2$Nsize
   
@@ -141,22 +141,20 @@ df3 = createDataTimeFromStrat(df, n.months=3)
 
 #### create models (not working now, need to choose how to do them)
 
-#model1 = glmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + offset(log(vax_potential)) + (1|code), 
-#               data=df3,family=poisson,
-#               control=glmerControl(optCtrl=list(maxfun=2e5)))
 
-model1 = lmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + vax_potential + (1|code), 
+model1 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + OtherL + AntiBibiL) +  (1|code),
               weights = weights, data=df1)
 
-model2 = lmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + vax_potential + (1|code), 
+model2 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + OtherL + AntiBibiL) +  (1|code),
               weights = weights, data=df2)
 
-model3 = lmer(vax ~ SE_INDEX + age20 + age60 + change + OtherL + OtherL:change + AntiBibiL + AntiBibiL:change + accumulated_cases + vax_potential + (1|code), 
+model3 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + OtherL + AntiBibiL) +  (1|code),
               weights = weights, data=df3)
+
 
 sjPlot::tab_model(list(model1,model2,model3),digits=4,collapse.ci =T,  show.intercept = F,p.style='stars')
 
-sjPlot::plot_model(model1,show.values=TRUE, show.p=TRUE)
+sjPlot::plot_model(model2,show.values=TRUE, show.p=TRUE)
 
 sjPlot::plot_models(model3,model2,model1,show.values=TRUE, show.p=TRUE,grid = T)+geom_hline(yintercept = 0,linetype='dashed')
 
@@ -164,36 +162,34 @@ sjPlot::plot_models(model3,model2,model1,show.values=TRUE, show.p=TRUE,grid = T)
 ###### model per party
 
 model3 = lmer(vax ~ 
-                SE_INDEX + 
-                age20 + age60 +
-                change + 
-                
-                ShasL + ShasL:change + 
-                YahadutHatoraL + YahadutHatoraL:change + 
-                ZionutDatitL + ZionutDatitL:change + 
-                KaholLavanL + KaholLavanL:change + 
-                MeretzL + MeretzL:change +
-                YeshAtidL + YeshAtidL:change + 
-                AvodaL + AvodaL:change + 
-                YaminaL + YaminaL:change + 
-                IsraelBeitenuL + IsraelBeitenuL:change + 
-                TikvaHadashaL + TikvaHadashaL:change +
-                RaamL + RaamL:change +
-                AravitL + AravitL:change +
-                OtherNoVoteL + OtherNoVoteL:change +
-                
-                accumulated_cases + 
-                vax_potential + 
+                change*(
+                  SE_INDEX + 
+                    age20 + age60 +
+                    ShasL + ShasL:change + 
+                    YahadutHatoraL + YahadutHatoraL:change + 
+                    ZionutDatitL + ZionutDatitL:change + 
+                    KaholLavanL + KaholLavanL:change + 
+                    MeretzL + MeretzL:change +
+                    YeshAtidL + YeshAtidL:change + 
+                    AvodaL + AvodaL:change + 
+                    YaminaL + YaminaL:change + 
+                    IsraelBeitenuL + IsraelBeitenuL:change + 
+                    TikvaHadashaL + TikvaHadashaL:change +
+                    RaamL + RaamL:change +
+                    AravitL + AravitL:change +
+                    OtherNoVoteL + OtherNoVoteL:change +
+                    
+                    accumulated_cases + 
+                    vax_potential) + 
                 (1|code), 
-              data=df3)
+              weights = weights,data=df3)
 
 sjPlot::plot_model(model3,show.values=TRUE, show.p=TRUE,
                    terms = c('change:ShasL','change:YahadutHatoraL','change:ZionutDatitL',
                              'change:YaminaL','change:TikvaHadashaL','change:IsraelBeitenuL',
                              'change:KaholLavanL','change:YeshAtidL','change:AvodaL',
-                             'change:MeretzL','change:RaamL','change:AravitL'
-                   ))+
-  geom_hline(yintercept = 1,linetype='dashed')
+                             'change:MeretzL','change:RaamL','change:AravitL','change:OtherNoVoteL'
+                   )) + ylim(c(-0.05,0.05)) + geom_hline(yintercept = 0,linetype='dashed')
 
 
 sjPlot::plot_models(model3,model2,model1,show.values=TRUE, show.p=TRUE,

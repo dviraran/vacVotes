@@ -160,7 +160,9 @@ getAreasAges = function(working.dir) {
       ages$age20[i] = 0
     }
   }
-  ages$age20 = ages$age20-ages$age60
+  
+  ages$age20 = (ages$age20-ages$age60)/100
+  ages$age60 = ages$age60/100
   
   ages
 }
