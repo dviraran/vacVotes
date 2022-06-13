@@ -120,7 +120,7 @@ df$vax_potential3 = vax_potential3[df$code]
 
 df$weights = df$Nsize/max(df$Nsize)
 
-createDataTimeFromStrat = function(df,n.months) {
+createDataTimeFromStart = function(df,n.months) {
   out1 = subset(df,df$time==n.months*30+30)
   out1$vax = out1$vax1/out1$vax_potential1
   out1$vax_potential = out1$vax_potential1/out1$Nsize
@@ -135,20 +135,25 @@ createDataTimeFromStrat = function(df,n.months) {
   out
 }
 
-df1 = createDataTimeFromStrat(df, n.months=1)
-df2 = createDataTimeFromStrat(df, n.months=2)
-df3 = createDataTimeFromStrat(df, n.months=3)
+df = assignSector(df,2021)
+
+df.general = subset(df,sector=='General')
+#df.general = subset(df.general,OtherNoVote<0.5)
+
+df1 = createDataTimeFromStart(df.general, n.months=1)
+df2 = createDataTimeFromStart(df.general, n.months=2)
+df3 = createDataTimeFromStart(df.general, n.months=3)
 
 #### create models (not working now, need to choose how to do them)
 
 
-model1 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + OtherL + AntiBibiL) +  (1|code),
+model1 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + vax_potential + OtherL + AntiBibiL) +  (1|code),
               weights = weights, data=df1)
 
-model2 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + OtherL + AntiBibiL) +  (1|code),
+model2 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + vax_potential + OtherL + AntiBibiL) +  (1|code),
               weights = weights, data=df2)
 
-model3 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + OtherL + AntiBibiL) +  (1|code),
+model3 = lmer(vax ~ change*(SE_INDEX + age20 + age60 + accumulated_cases + vax_potential + OtherL + AntiBibiL) +  (1|code),
               weights = weights, data=df3)
 
 
@@ -162,9 +167,14 @@ sjPlot::plot_models(model3,model2,model1,show.values=TRUE, show.p=TRUE,grid = T)
 ###### model per party
 
 model3 = lmer(vax ~ 
+                SE_INDEX + 
+                age20 + 
+                age60 +
                 change*(
-                  SE_INDEX + 
-                    age20 + age60 +
+
+                    accumulated_cases + 
+                    vax_potential + 
+                    
                     ShasL + ShasL:change + 
                     YahadutHatoraL + YahadutHatoraL:change + 
                     ZionutDatitL + ZionutDatitL:change + 
@@ -177,10 +187,7 @@ model3 = lmer(vax ~
                     TikvaHadashaL + TikvaHadashaL:change +
                     RaamL + RaamL:change +
                     AravitL + AravitL:change +
-                    OtherNoVoteL + OtherNoVoteL:change +
-                    
-                    accumulated_cases + 
-                    vax_potential) + 
+                    OtherNoVoteL + OtherNoVoteL:change) + 
                 (1|code), 
               weights = weights,data=df3)
 
@@ -189,7 +196,7 @@ sjPlot::plot_model(model3,show.values=TRUE, show.p=TRUE,
                              'change:YaminaL','change:TikvaHadashaL','change:IsraelBeitenuL',
                              'change:KaholLavanL','change:YeshAtidL','change:AvodaL',
                              'change:MeretzL','change:RaamL','change:AravitL','change:OtherNoVoteL'
-                   )) + ylim(c(-0.05,0.05)) + geom_hline(yintercept = 0,linetype='dashed')
+                   )) + ylim(c(-0.025,0.025)) + geom_hline(yintercept = 0,linetype='dashed')
 
 
 sjPlot::plot_models(model3,model2,model1,show.values=TRUE, show.p=TRUE,
